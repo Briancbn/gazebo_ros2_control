@@ -27,6 +27,9 @@ public:
   /// \brief e_stop_active_ is true if the emergency stop is active.
   bool e_stop_active_;
 
+  /// \brief initialized_ is true if the first state of the robot is received
+  bool initialized_ = false;
+
   /// \brief Emergency stop subscriber.
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr e_stop_sub_;
 
@@ -392,6 +395,7 @@ hardware_interface::return_type GazeboSystem::write()
   rclcpp::Time sim_time_ros(gz_time_now.sec, gz_time_now.nsec);
   rclcpp::Duration sim_period = sim_time_ros - this->dataPtr->last_update_sim_time_ros_;
 
+
   for (unsigned int j = 0; j < this->dataPtr->joint_names_.size(); j++) {
     switch (this->dataPtr->joint_control_methods_[j]) {
       case EFFORT:
@@ -402,6 +406,19 @@ hardware_interface::return_type GazeboSystem::write()
         }
         break;
       case POSITION:
+        // Hard set the joint position to that of the initial state
+        if (!this->dataPtr->initialized_) {
+          RCLCPP_INFO(this->nh_->get_logger(), "Joint [%s] Position state: %f, command %f",
+              this->dataPtr->joint_names_[j].c_str(),
+              this->dataPtr->joint_position_[j],
+              this->dataPtr->joint_position_cmd_[j]);
+          this->dataPtr->joint_pos_cmd_[j]->set_value(this->dataPtr->joint_position_[j]);
+          RCLCPP_INFO(this->nh_->get_logger(), "Joint [%s] Position state: %f, command %f",
+              this->dataPtr->joint_names_[j].c_str(),
+              this->dataPtr->joint_position_[j],
+              this->dataPtr->joint_position_cmd_[j]);
+          this->dataPtr->last_joint_position_cmd_[j] = this->dataPtr->joint_position_cmd_[j];
+        }
         if (this->dataPtr->e_stop_active_) {
           // If the E-stop is active, joints controlled by position commands will maintain
           // their positions.
@@ -475,6 +492,18 @@ hardware_interface::return_type GazeboSystem::write()
   }
 
   this->dataPtr->last_update_sim_time_ros_ = sim_time_ros;
+
+  // Debugging
+  for (unsigned int j = 0; j < this->dataPtr->joint_names_.size(); j++) {
+    // RCLCPP_INFO(this->nh_->get_logger(), "joint [%s] position: command: %f, state: %f",
+    //     this->dataPtr->joint_names_[j].c_str(),
+    //     this->dataPtr->joint_position_cmd_[j],
+    //     this->dataPtr->joint_position_[j]);
+  }
+
+  if (!this->dataPtr->initialized_) {
+    this->dataPtr->initialized_ = true;
+  }
 
   return hardware_interface::return_type::OK;
 }

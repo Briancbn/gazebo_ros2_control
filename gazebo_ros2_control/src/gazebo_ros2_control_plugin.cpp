@@ -198,13 +198,13 @@ void GazeboRosControlPlugin::Load(gazebo::physics::ModelPtr parent, sdf::Element
   }
 
   // Get the Gazebo simulation period
-  rclcpp::Duration gazebo_period(impl_->parent_model_->GetWorld()->Physics()->GetMaxStepSize());
+  RCLCPP_INFO(impl_->model_nh_->get_logger(), "Step size %f",
+      impl_->parent_model_->GetWorld()->Physics()->GetMaxStepSize());
+  rclcpp::Duration gazebo_period(impl_->parent_model_->GetWorld()->Physics()->GetMaxStepSize() * 1e9);
 
   // Decide the plugin control period
   if (sdf->HasElement("control_period")) {
-    impl_->control_period_ = rclcpp::Duration(
-      std::chrono::duration_cast<std::chrono::nanoseconds>(
-        std::chrono::duration<double>(sdf->Get<double>("control_period"))));
+    impl_->control_period_ = rclcpp::Duration(sdf->Get<double>("control_period") * 1e9);
 
     // Check the period against the simulation period
     if (impl_->control_period_ < gazebo_period) {
@@ -220,7 +220,7 @@ void GazeboRosControlPlugin::Load(gazebo::physics::ModelPtr parent, sdf::Element
     }
   } else {
     impl_->control_period_ = gazebo_period;
-    RCLCPP_DEBUG_STREAM(
+    RCLCPP_INFO_STREAM(
       impl_->model_nh_->get_logger(),
       "Control period not found in URDF/SDF, defaulting to Gazebo period of " <<
         impl_->control_period_.seconds());
